@@ -9,21 +9,22 @@
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
   :root{
-    --amber:#ffc247; --cyan:#3ff0ff; --magenta:#ff43b0; --lime:#b6ff3d;
-    --ink:#f3ecff; --dim:#a795d6; --grid:#4a22a5;
+    --amber:#ffbb5c; --cyan:#6de9ff; --magenta:#ff5bbd; --lime:#9efc85;
+    --ink:#fff7fb; --dim:#d7c5ff; --grid:#4a2b72;
   }
   *{box-sizing:border-box}
   body{
-    margin:0; min-height:100%;
-    background:radial-gradient(120% 90% at 50% -10%, #3a1a7a 0%, #150a34 55%, #08031a 100%);
+    margin:0; min-height:100vh;
+    background:radial-gradient(120% 90% at 50% -10%, #ff8a5b 0%, #5c1f69 35%, #12091e 72%, #070510 100%);
     color:var(--ink); font-family:"Nunito","Segoe UI",system-ui,sans-serif;
-    display:flex; justify-content:center; align-items:flex-start;
-    padding:16px 10px 36px; -webkit-tap-highlight-color:transparent;
+    display:flex; justify-content:center; align-items:center;
+    padding:24px 10px 32px; -webkit-tap-highlight-color:transparent;
   }
   .cabinet{
     width:min(940px,100%); border-radius:20px; padding:13px;
-    background:linear-gradient(180deg,#3c1a86,#1a0b42);
-    box-shadow:0 0 0 2px #6a3fd6 inset, 0 24px 60px rgba(0,0,0,.6);
+    background:linear-gradient(180deg,#6b215f,#241336 52%, #120a22);
+    box-shadow:0 0 0 2px #ff8a5b inset, 0 24px 60px rgba(0,0,0,.65);
+    margin:0 auto;
   }
   .marquee{display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap; padding:4px 6px 12px}
   .marquee h1{
@@ -56,25 +57,25 @@
 
   .strip{
     min-height:56px; display:flex; flex-direction:column; justify-content:center; gap:7px;
-    padding:9px 14px; background:linear-gradient(180deg,#1f0d50,#170939);
+    padding:9px 14px; background:linear-gradient(180deg,#2c1a46,#170d2f);
     border-bottom:2px solid var(--grid);
   }
   .strip .line{display:flex; align-items:center; gap:10px; font-size:14px; line-height:1.35}
   .strip .tag{
     font-family:"Press Start 2P",monospace; font-size:9px; padding:5px 7px; border-radius:5px;
-    background:var(--grid); color:#e8dcff; flex:0 0 auto;
+    background:linear-gradient(180deg,#6b3db3,#35225e); color:#fef3ff; flex:0 0 auto;
   }
-  .strip .tag.bonus{background:var(--amber); color:#2b0f52}
+  .strip .tag.bonus{background:linear-gradient(180deg,#ffbf69,#ff8749); color:#2d112d}
 
   canvas{display:block; width:100%; height:auto; background:#0b0524; touch-action:none}
 
   .pad{display:none; gap:9px; padding:9px; background:#1a0a44; border-top:2px solid var(--grid)}
   .pad button{
     flex:1; padding:15px 0; border:none; border-radius:9px;
-    font-family:"Press Start 2P",monospace; font-size:11px; color:#150835;
-    background:var(--dim); box-shadow:0 4px 0 #5b4795;
+    font-family:"Press Start 2P",monospace; font-size:11px; color:#210d2c;
+    background:linear-gradient(180deg,#d9c5ff,#b99af2); box-shadow:0 4px 0 #7057ad;
   }
-  .pad .jump{flex:1.5; background:var(--lime); box-shadow:0 4px 0 #6f9c1f}
+  .pad .jump{flex:1.5; background:linear-gradient(180deg,#b9ff8f,#7be95d); box-shadow:0 4px 0 #4d9f38}
   .pad button:active{transform:translateY(3px); box-shadow:0 1px 0 #5b4795}
   @media (max-width:820px), (pointer:coarse){ .pad{display:flex} }
 
@@ -89,11 +90,11 @@
   .layer p{margin:0; max-width:54ch; font-size:14.5px; line-height:1.5; color:#ded3ff}
   .btn{
     font-family:"Press Start 2P",monospace; font-size:12px; padding:15px 24px;
-    border:none; border-radius:9px; background:var(--amber); color:#2b0f52;
-    cursor:pointer; box-shadow:0 5px 0 #b57614;
+    border:none; border-radius:9px; background:linear-gradient(180deg,#ffbd67,#ff8e4f); color:#2a0d2a;
+    cursor:pointer; box-shadow:0 5px 0 #d96c32;
   }
-  .btn:active{transform:translateY(4px); box-shadow:0 1px 0 #b57614}
-  .btn.ghost{background:transparent; color:var(--dim); border:2px solid var(--grid); box-shadow:none; font-size:10px; padding:11px 16px}
+  .btn:active{transform:translateY(4px); box-shadow:0 1px 0 #d96c32}
+  .btn.ghost{background:rgba(255,255,255,.03); color:var(--dim); border:2px solid var(--grid); box-shadow:none; font-size:10px; padding:11px 16px}
   .btn.ghost:active{transform:none}
   .row{display:flex; gap:9px; flex-wrap:wrap; justify-content:center}
 
