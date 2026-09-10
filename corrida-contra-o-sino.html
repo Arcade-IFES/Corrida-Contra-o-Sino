@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Corrida Contra o Sino — arcade</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --amber:#ffc247; --cyan:#3ff0ff; --magenta:#ff43b0; --lime:#b6ff3d;
+    --ink:#f3ecff; --dim:#a795d6; --grid:#4a22a5;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; min-height:100%;
+    background:radial-gradient(120% 90% at 50% -10%, #3a1a7a 0%, #150a34 55%, #08031a 100%);
+    color:var(--ink); font-family:"Nunito","Segoe UI",system-ui,sans-serif;
+    display:flex; justify-content:center; align-items:flex-start;
+    padding:16px 10px 36px; -webkit-tap-highlight-color:transparent;
+  }
+  .cabinet{
+    width:min(940px,100%); border-radius:20px; padding:13px;
+    background:linear-gradient(180deg,#3c1a86,#1a0b42);
+    box-shadow:0 0 0 2px #6a3fd6 inset, 0 24px 60px rgba(0,0,0,.6);
+  }
+  .marquee{display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap; padding:4px 6px 12px}
+  .marquee h1{
+    font-family:"Press Start 2P",monospace; margin:0;
+    font-size:clamp(13px,2.5vw,20px); line-height:1.5;
+    color:var(--amber); text-shadow:0 0 12px rgba(255,194,71,.5), 3px 3px 0 #7a2bb8;
+  }
+  .marquee p{margin:0; font-size:12.5px; color:var(--dim)}
+
+  .screen{position:relative; background:#0b0524; border-radius:12px; overflow:hidden;
+    box-shadow:0 0 0 4px #0a0322, 0 0 0 6px #6a3fd6}
+  .screen::after{
+    content:""; position:absolute; inset:0; pointer-events:none; z-index:5;
+    background:repeating-linear-gradient(180deg, rgba(0,0,0,.26) 0 1px, transparent 1px 3px);
+    mix-blend-mode:multiply;
+  }
+
+  .hud{
+    display:flex; justify-content:space-between; align-items:center; gap:8px 14px; flex-wrap:wrap;
+    padding:8px 12px; background:#1a0a44; border-bottom:2px solid var(--grid);
+    font-family:"Press Start 2P",monospace; font-size:9.5px; letter-spacing:.4px;
+  }
+  .hud span{color:var(--dim)}
+  .hud b{font-weight:400; color:var(--ink)}
+  .hud .pts{color:var(--amber); font-size:12px}
+  .hud .mult{color:var(--lime)}
+  .hud .lives{font-family:"Nunito",sans-serif; font-size:15px; color:var(--magenta); letter-spacing:2px}
+  .hud .best{color:var(--dim)}
+  .hud .moedas{color:var(--cyan)}
+
+  .strip{
+    min-height:56px; display:flex; flex-direction:column; justify-content:center; gap:7px;
+    padding:9px 14px; background:linear-gradient(180deg,#1f0d50,#170939);
+    border-bottom:2px solid var(--grid);
+  }
+  .strip .line{display:flex; align-items:center; gap:10px; font-size:14px; line-height:1.35}
+  .strip .tag{
+    font-family:"Press Start 2P",monospace; font-size:9px; padding:5px 7px; border-radius:5px;
+    background:var(--grid); color:#e8dcff; flex:0 0 auto;
+  }
+  .strip .tag.bonus{background:var(--amber); color:#2b0f52}
+
+  canvas{display:block; width:100%; height:auto; background:#0b0524; touch-action:none}
+
+  .pad{display:none; gap:9px; padding:9px; background:#1a0a44; border-top:2px solid var(--grid)}
+  .pad button{
+    flex:1; padding:15px 0; border:none; border-radius:9px;
+    font-family:"Press Start 2P",monospace; font-size:11px; color:#150835;
+    background:var(--dim); box-shadow:0 4px 0 #5b4795;
+  }
+  .pad .jump{flex:1.5; background:var(--lime); box-shadow:0 4px 0 #6f9c1f}
+  .pad button:active{transform:translateY(3px); box-shadow:0 1px 0 #5b4795}
+  @media (max-width:820px), (pointer:coarse){ .pad{display:flex} }
+
+  .layer{
+    position:absolute; inset:0; z-index:6; display:none;
+    flex-direction:column; justify-content:center; align-items:center; gap:15px;
+    padding:24px 18px; background:rgba(9,4,28,.95); text-align:center; overflow-y:auto;
+  }
+  .layer.on{display:flex}
+  .layer h2{font-family:"Press Start 2P",monospace; margin:0; line-height:1.6;
+    font-size:clamp(14px,2.6vw,20px); color:var(--cyan)}
+  .layer p{margin:0; max-width:54ch; font-size:14.5px; line-height:1.5; color:#ded3ff}
+  .btn{
+    font-family:"Press Start 2P",monospace; font-size:12px; padding:15px 24px;
+    border:none; border-radius:9px; background:var(--amber); color:#2b0f52;
+    cursor:pointer; box-shadow:0 5px 0 #b57614;
+  }
+  .btn:active{transform:translateY(4px); box-shadow:0 1px 0 #b57614}
+  .btn.ghost{background:transparent; color:var(--dim); border:2px solid var(--grid); box-shadow:none; font-size:10px; padding:11px 16px}
+  .btn.ghost:active{transform:none}
+  .row{display:flex; gap:9px; flex-wrap:wrap; justify-content:center}
+
+  .rules{text-align:left; max-width:470px; display:grid; gap:7px; font-size:13.5px; color:#cdbdf5; line-height:1.45}
+  .rules div{display:flex; gap:10px}
+  .rules b{color:var(--amber); font-family:"Press Start 2P",monospace; font-size:9px; padding-top:3px; flex:0 0 46px}
+
+  .keys{font-size:12.5px; color:var(--dim); line-height:1.8}
+  .keys kbd{background:#2d1568; border:1px solid #6a3fd6; border-radius:4px; padding:1px 6px; font-family:"Press Start 2P",monospace; font-size:8.5px}
+
+  .stats{display:flex; gap:8px; flex-wrap:wrap; justify-content:center}
+  .stat{background:#1e0f4a; border:2px solid var(--grid); border-radius:9px; padding:9px 14px; min-width:88px}
+  .stat b{display:block; font-family:"Press Start 2P",monospace; font-size:14px; color:var(--amber)}
+  .stat small{color:var(--dim); font-size:10.5px}
+
+  #initials{
+    font-family:"Press Start 2P",monospace; font-size:26px; text-align:center;
+    width:190px; padding:12px 0; letter-spacing:12px; text-indent:12px;
+    background:#1e0f4a; border:2px solid var(--cyan); border-radius:9px; color:var(--cyan);
+    text-transform:uppercase; outline:none;
+  }
+
+  table.rank{width:min(520px,100%); border-collapse:collapse; font-size:13.5px}
+  table.rank th{font-family:"Press Start 2P",monospace; font-size:8.5px; color:var(--dim);
+    text-align:left; padding:0 8px 8px; font-weight:400}
+  table.rank td{padding:7px 8px; border-top:1px solid #2f1667}
+  table.rank tr.me td{background:rgba(255,194,71,.12); color:var(--amber)}
+  table.rank .pos{font-family:"Press Start 2P",monospace; font-size:10px; color:var(--magenta); width:34px}
+  table.rank .nm{font-family:"Press Start 2P",monospace; font-size:11px}
+  table.rank .sc{text-align:right; font-weight:900}
+  table.rank .wv{text-align:right; color:var(--dim)}
+
+  .missed{width:min(520px,100%); text-align:left; display:grid; gap:7px}
+  .missed div{background:#22104f; border-radius:8px; padding:9px 12px; font-size:13px; line-height:1.45}
+  .missed em{font-style:normal; color:var(--magenta)}
+  .missed b{color:var(--lime)}
+
+  .quiz-ops{display:grid; grid-template-columns:1fr 1fr; gap:10px; width:min(560px,100%)}
+  .quiz-ops button{
+    font-family:"Nunito",sans-serif; font-weight:700; font-size:14px; padding:14px 10px;
+    border-radius:9px; border:2px solid var(--grid); background:#1e0f4a; color:var(--ink);
+    cursor:pointer; text-align:left;
+  }
+  .quiz-ops button:active{background:#2d1568}
+  .quiz-ops button .k{font-family:"Press Start 2P",monospace; font-size:9px; color:var(--amber); margin-right:8px}
+  .qbar{height:7px; width:min(400px,100%); border-radius:4px; background:#33176f; overflow:hidden}
+  .qbar i{display:block; height:100%; width:100%; background:linear-gradient(90deg,var(--lime),var(--amber))}
+
+  footer{margin-top:11px; text-align:center; color:var(--dim); font-size:12.5px; line-height:1.6}
+  footer code{background:#2d1568; padding:1px 6px; border-radius:4px; color:var(--cyan)}
+</style>
+</head>
+<body>
+<div class="cabinet">
+  <div class="marquee">
+    <h1>Corrida Contra o Sino</h1>
+    <p>Atravesse o pátio até o sino. Cada portão trancado cobra uma pergunta.</p>
+  </div>
+
+  <div class="screen">
+    <div class="hud">
+      <div><span>pontos</span> <b class="pts" id="hScore">0</b></div>
+      <div><span>combo</span> <b class="mult" id="hMult">x1</b></div>
+      <div><span>fase</span> <b id="hFase">1</b></div>
+      <div><span>vidas</span> <b class="lives" id="hLives">●●●</b></div>
+      <div><span>moedas</span> <b class="moedas" id="hMoedas">0</b></div>
+      <div><span>recorde</span> <b class="best" id="hBest">—</b></div>
+    </div>
+
+    <div class="strip" id="strip">
+      <div class="line"><span class="tag" id="stripTag">PRONTO</span><span id="stripText">Toque em jogar para começar.</span></div>
+    </div>
+
+    <canvas id="game" width="900" height="500"></canvas>
+
+    <div class="pad">
+      <button id="btnL">◀</button>
+      <button class="jump" id="btnJ">PULAR</button>
+      <button id="btnR">▶</button>
+    </div>
+
+    <div class="layer on" id="lyMenu">
+      <h2>Corrida Contra o Sino</h2>
+      <div class="rules">
+        <div><b>alvo</b><span>Corra e pule pelo pátio até o portão do fim de cada fase. Buracos e espinhos tiram uma vida; pise fora deles.</span></div>
+        <div><b>moedas</b><span>Pegue moedas sem se machucar para subir o combo, até x8. Um só dano zera tudo.</span></div>
+        <div><b>portão</b><span>Todo portão vem trancado com uma pergunta. Acertar abre o portão com bônus de pontos; errar abre também, mas custa uma vida e não dá bônus.</span></div>
+        <div><b>rank</b><span>Três vidas, sem continues, mesma dificuldade para todos. Só o placar final vale.</span></div>
+      </div>
+      <div class="row">
+        <button class="btn" id="btnStart">JOGAR</button>
+        <button class="btn ghost" id="btnSeeRank">VER RANKING</button>
+      </div>
+      <div class="keys"><kbd>←</kbd> <kbd>→</kbd> movem &nbsp;·&nbsp; <kbd>espaço</kbd> pula &nbsp;·&nbsp; <kbd>P</kbd> pausa</div>
+    </div>
+
+    <div class="layer" id="lyPause">
+      <h2>Pausado</h2>
+      <button class="btn" id="btnResume">CONTINUAR</button>
+    </div>
+
+    <div class="layer" id="lyQuiz">
+      <h2 id="quizTag">PORTÃO TRANCADO</h2>
+      <p id="quizPergunta">—</p>
+      <div class="qbar"><i id="quizBar"></i></div>
+      <div class="quiz-ops" id="quizOps"></div>
+    </div>
+
+    <div class="layer" id="lyName">
+      <h2 id="nameTitle">Fim de jogo</h2>
+      <div class="stats">
+        <div class="stat"><b id="nScore">0</b><small>pontos</small></div>
+        <div class="stat"><b id="nFase">1</b><small>fase</small></div>
+        <div class="stat"><b id="nMoedas">0</b><small>moedas</small></div>
+        <div class="stat"><b id="nQuiz">0/0</b><small>portões</small></div>
+      </div>
+      <p id="nameHint">Digite suas iniciais para entrar no ranking.</p>
+      <input id="initials" maxlength="3" autocomplete="off" spellcheck="false" placeholder="AAA">
+      <div class="row">
+        <button class="btn" id="btnSave">GRAVAR PLACAR</button>
+        <button class="btn ghost" id="btnSkip">PULAR</button>
+      </div>
+      <div class="missed" id="nMissed"></div>
+    </div>
+
+    <div class="layer" id="lyRank">
+      <h2>Melhores corredores</h2>
+      <table class="rank">
+        <thead><tr><th></th><th>corredor</th><th style="text-align:right">pontos</th><th style="text-align:right">fase</th></tr></thead>
+        <tbody id="rankBody"></tbody>
+      </table>
+      <p id="rankNote" style="font-size:12.5px;color:#a795d6"></p>
+      <div class="row">
+        <button class="btn" id="btnRestart">JOGAR</button>
+        <button class="btn ghost" id="btnBackMenu">VOLTAR</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  Ranking compartilhado por todos que abrirem esta página. Para ligar no sistema da escola, troque as duas funções de <code>ranking</code>.
+</footer>
+
+<script>
+/* =====================================================================
+   1. PERGUNTAS — mesmo banco usado no Órbita do Saber, pelo acordo
+   da turma de manter um banco único entre os jogos do Recreio Arcade.
+   ===================================================================== */
+const PERGUNTAS = [
+  { q:"Qual é o valor de log₂ 32?", a:["5","4","6","8"], e:"2⁵ = 32, então o logaritmo vale 5." },
+  { q:"Se f(x) = 2x² − 3x + 1, quanto vale f(2)?", a:["3","5","2","7"], e:"8 − 6 + 1 = 3." },
+  { q:"Qual é o discriminante de x² − 5x + 6?", a:["1","25","−1","5"], e:"Δ = b² − 4ac = 25 − 24 = 1." },
+  { q:"Some os 10 primeiros termos da PA (2, 5, 8, …).", a:["155","145","165","150"], e:"a₁₀ = 29; S = (2 + 29)·10/2 = 155." },
+  { q:"Quanto vale sen 30°?", a:["1/2","√2/2","√3/2","1"], e:"Ângulo notável: sen 30° = 1/2 e cos 30° = √3/2." },
+  { q:"Quantos anagramas tem a palavra AMOR?", a:["24","12","16","4"], e:"4 letras distintas: 4! = 24." },
+  { q:"Qual a probabilidade de sair número par num dado?", a:["1/2","1/3","1/6","2/3"], e:"3 casos favoráveis em 6 possíveis." },
+  { q:"Quanto é (2⁵ · 2³) ÷ 2⁴?", a:["16","32","8","64"], e:"5 + 3 − 4 = 4, e 2⁴ = 16." },
+  { q:"Qual é a área de um círculo de raio 3?", a:["9π","6π","3π","12π"], e:"A = πr² = π · 9." },
+  { q:"Resolva 2ˣ = 128.", a:["7","6","8","5"], e:"128 = 2⁷." },
+  { q:"Qual o determinante da matriz [[2,1],[3,4]]?", a:["5","11","8","−5"], e:"2·4 − 1·3 = 5." },
+  { q:"Qual a média aritmética de 4, 8, 10 e 10?", a:["8","7","9","10"], e:"32 ÷ 4 = 8." },
+  { q:"Qual é a unidade de força no SI?", a:["newton","joule","watt","pascal"], e:"Joule é energia; watt, potência; pascal, pressão." },
+  { q:"Qual o valor aproximado da gravidade na Terra?", a:["9,8 m/s²","5 m/s²","12 m/s²","1 m/s²"], e:"Cerca de 9,8 m/s² ao nível do mar." },
+  { q:"No movimento retilíneo uniforme, a velocidade é:", a:["constante","crescente","nula","variável"], e:"MRU tem aceleração zero, logo velocidade constante." },
+  { q:"Como se escreve a segunda lei de Newton?", a:["F = m·a","F = m/a","F = a/m","F = m+a"], e:"Força é o produto da massa pela aceleração." },
+  { q:"Qual é a unidade de potência no SI?", a:["watt","joule","newton","ampère"], e:"1 watt = 1 joule por segundo." },
+  { q:"A energia cinética é proporcional ao quadrado de qual grandeza?", a:["velocidade","massa","tempo","altura"], e:"Ec = m·v²/2 — dobrar a velocidade quadruplica a energia." },
+  { q:"Em que unidade se mede a corrente elétrica?", a:["ampère","volt","ohm","watt"], e:"Volt é tensão e ohm, resistência." },
+  { q:"Como se expressa a primeira lei de Ohm?", a:["U = R·i","U = R/i","R = U·i","i = U·R"], e:"A tensão é o produto da resistência pela corrente." },
+  { q:"Qual é o número atômico do carbono?", a:["6","12","14","8"], e:"6 prótons; 12 é a massa atômica aproximada." },
+  { q:"Qual é o pH de uma solução neutra a 25 °C?", a:["7","0","14","1"], e:"Abaixo de 7 é ácido; acima, básico." },
+  { q:"Que tipo de ligação une sódio e cloro no NaCl?", a:["iônica","covalente","metálica","dipolo"], e:"O metal cede elétron ao não metal, formando íons." },
+  { q:"Quantos elétrons há na camada de valência do oxigênio?", a:["6","8","2","4"], e:"Família 16, por isso ele faz duas ligações." },
+  { q:"Os elementos da coluna 18 são chamados de:", a:["nobres","halogênios","alcalinos","metais"], e:"Gases nobres têm a camada de valência completa." },
+  { q:"Isótopos de um mesmo elemento têm igual número de:", a:["prótons","nêutrons","massa","nada"], e:"Mudam os nêutrons, e com eles a massa." },
+  { q:"Uma reação que libera calor é chamada de:", a:["exotérmica","endotérmica","isotérmica","catalítica"], e:"Endotérmica é o contrário: absorve calor." },
+  { q:"Qual é a fórmula do ácido sulfúrico?", a:["H₂SO₄","HCl","HNO₃","H₂CO₃"], e:"HCl é clorídrico e HNO₃, nítrico." },
+  { q:"Que molécula guarda a informação genética?", a:["DNA","RNA","ATP","lipídio"], e:"O RNA transporta a mensagem; o DNA a armazena." },
+  { q:"Qual divisão celular produz os gametas?", a:["meiose","mitose","mutação","clivagem"], e:"A meiose reduz o número de cromossomos pela metade." },
+  { q:"Que base existe no RNA e não no DNA?", a:["uracila","timina","adenina","citosina"], e:"No RNA a uracila ocupa o lugar da timina." },
+  { q:"Quem propôs a evolução por seleção natural?", a:["Darwin","Lamarck","Mendel","Pasteur"], e:"Lamarck defendia a herança de caracteres adquiridos." },
+  { q:"Qual organela sintetiza proteínas?", a:["ribossomo","lisossomo","vacúolo","centríolo"], e:"Ele traduz o RNA mensageiro em cadeias de aminoácidos." },
+  { q:"Como se chama o conjunto de indivíduos da mesma espécie numa área?", a:["população","comunidade","bioma","habitat"], e:"Várias populações juntas formam uma comunidade." },
+  { q:"Quem escreveu Vidas Secas?", a:["Graciliano","Jorge Amado","Machado","Drummond"], e:"Graciliano Ramos, marco do romance de 30." },
+  { q:"Dom Casmurro pertence a que autor?", a:["Machado","Alencar","Aluísio","Eça"], e:"Machado de Assis, do Realismo brasileiro." },
+  { q:"O Guarani pertence a qual movimento?", a:["Romantismo","Barroco","Realismo","Modernismo"], e:"Romantismo indianista, de José de Alencar." },
+  { q:"Em que ano ocorreu a Semana de Arte Moderna?", a:["1922","1930","1902","1945"], e:"Fevereiro de 1922, no Theatro Municipal de SP." },
+  { q:"Que figura há em “silêncio ensurdecedor”?", a:["paradoxo","metáfora","hipérbole","elipse"], e:"Paradoxo une ideias que se contradizem." },
+  { q:"Complete: “Assisti ___ filme ontem.”", a:["ao","o","no","do"], e:"Assistir no sentido de ver pede a preposição a." },
+  { q:"Qual é a forma correta ao indicar tempo?", a:["Faz dez anos","Fazem dez anos","Fizeram dez","Fazia-se dez"], e:"Fazer indicando tempo é impessoal: fica no singular." },
+  { q:"Em que ano começou a ditadura militar no Brasil?", a:["1964","1954","1937","1985"], e:"O golpe foi em 31 de março de 1964." },
+  { q:"Em que ano caiu o Muro de Berlim?", a:["1989","1991","1979","1968"], e:"Novembro de 1989; a URSS acabou em 1991." },
+  { q:"Em que ano começou a Revolução Francesa?", a:["1789","1776","1815","1848"], e:"A queda da Bastilha foi em 14 de julho de 1789." },
+  { q:"Em que ano terminou o Estado Novo de Vargas?", a:["1945","1930","1954","1964"], e:"Vargas foi deposto em outubro de 1945." },
+  { q:"Qual é o maior produtor mundial de café?", a:["Brasil","Colômbia","Vietnã","Etiópia"], e:"O Brasil lidera desde o século XIX." },
+  { q:"Quantos fusos horários o Brasil possui?", a:["4","2","3","5"], e:"Quatro, sendo três em território continental." },
+  { q:"Em que ano foi criada a ONU?", a:["1945","1919","1939","1948"], e:"Logo após a Segunda Guerra; 1919 foi a Liga das Nações." }
+];
+
+/* =====================================================================
+   2. RANKING (modo standalone, fora da plataforma local)
+   Troque estas duas funções para gravar no servidor da escola.
+   ===================================================================== */
+const RANK_KEY = "sino_ranking_v1";
+const ranking = {
+  async carregar(){
+    try{
+      if(window.storage){
+        const r = await window.storage.get(RANK_KEY, true);
+        return r ? JSON.parse(r.value) : [];
+      }
+    }catch(e){ return []; }
+    try{
+      if(window.localStorage){
+        const v = localStorage.getItem(RANK_KEY);
+        return v ? JSON.parse(v) : [];
+      }
+    }catch(e){}
+    return [];
+  },
+  async gravar(lista){
+    try{
+      if(window.storage){ await window.storage.set(RANK_KEY, JSON.stringify(lista), true); return true; }
+    }catch(e){ return false; }
+    try{
+      if(window.localStorage){ localStorage.setItem(RANK_KEY, JSON.stringify(lista)); return true; }
+    }catch(e){}
+    return false;
+  }
+};
+
+/* =====================================================================
+   3. MOTOR
+   ===================================================================== */
+const cv = document.getElementById("game");
+const ctx = cv.getContext("2d");
+const W = cv.width, H = cv.height;
+const CHAO = 420;
+const el = id => document.getElementById(id);
+
+let estado = "menu"; // menu | jogo | portao | pausa | fim
+let g = null, ultimo = 0, listaRank = [];
+
+/* ---- Contrato com a Plataforma Local (Recreio Arcade) ----
+   Mesmo princípio do Órbita do Saber: HOSPEDADO detecta se este
+   arquivo está dentro do iframe da plataforma. Fora dele (arquivo
+   aberto direto), o jogo funciona sozinho com ranking local, útil
+   para testar sem a plataforma no ar.
+
+   Este arquivo usa um formato de payload um pouco mais genérico que
+   o Órbita (campos comuns no topo + "metadata" para o que é específico
+   deste jogo) — vale usar este como o formato final e ajustar o Órbita
+   para bater com ele antes de fechar em plenária (RE-07). */
+const HOSPEDADO = window.top !== window.self;
+let jogadorNome = null;
+
+function enviarParaHost(tipo, payload){
+  if(!HOSPEDADO) return;
+  window.parent.postMessage({ type: tipo, jogo: "corrida-contra-o-sino", payload }, "*");
+}
+
+addEventListener("message", (ev) => {
+  const msg = ev.data;
+  if(!msg || typeof msg !== "object") return;
+  if(msg.type === "PLAYER_INFO"){
+    jogadorNome = (msg.payload && msg.payload.nickname) || null;
+    const sub = document.querySelector(".marquee p");
+    if(sub && jogadorNome) sub.textContent = "Corredor: " + jogadorNome + " · alcance o sino.";
+  }
+  if(msg.type === "RESTART_GAME"){
+    fecharCamadas();
+    iniciar();
+  }
+});
+
+if(HOSPEDADO && el("btnSeeRank")) el("btnSeeRank").style.display = "none";
+
+function baralhar(a){
+  const b = a.slice();
+  for(let i = b.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [b[i], b[j]] = [b[j], b[i]];
+  }
+  return b;
+}
+
+let ac = null;
+function bip(f, d = .07, t = "square", v = .04){
+  try{
+    if(!ac) ac = new (window.AudioContext || window.webkitAudioContext)();
+    const o = ac.createOscillator(), gn = ac.createGain();
+    o.type = t; o.frequency.value = f;
+    gn.gain.setValueAtTime(v, ac.currentTime);
+    gn.gain.exponentialRampToValueAtTime(.0001, ac.currentTime + d);
+    o.connect(gn).connect(ac.destination); o.start(); o.stop(ac.currentTime + d);
+  }catch(e){}
+}
+
+/* ---- Geração de fase ---- */
+function gerarFase(fase){
+  const dif = Math.min(fase, 10);
+  const platafs = [{ x:0, y:CHAO, w:260, h:80 }];
+  const moedas = [], espinhos = [], inimigos = [];
+  let x = 260;
+  const segmentos = 6 + Math.floor(fase/2);
+  for(let i = 0; i < segmentos; i++){
+    const gap = 55 + Math.random()*35 + dif*7;
+    x += gap;
+    const largura = 110 + Math.random()*90;
+    const elevada = Math.random() < .35;
+    const y = elevada ? CHAO - (40 + Math.random()*80) : CHAO;
+    platafs.push({ x, y, w:largura, h: CHAO + 80 - y });
+    if(Math.random() < .8) moedas.push({ x:x + largura/2 - 6, y:y - 26, w:12, h:12, viva:true });
+    if(Math.random() < .18 + dif*.02) espinhos.push({ x:x + largura*.6, y:y - 16, w:22, h:16 });
+    if(fase > 1 && Math.random() < .25 + dif*.02){
+      const min = x + 8, max = x + largura - 32;
+      inimigos.push({ x:min, y:y - 24, w:24, h:24, min, max, dir:1, vel:1 + dif*.18, vivo:true, animar:Math.random()*6 });
+    }
+    x += largura;
+  }
+  const finalX = x + 70;
+  platafs.push({ x:finalX - 30, y:CHAO, w:280, h:80 });
+  const portao = { x:finalX + 150, y:CHAO - 96, w:34, h:96, aberto:false, tentado:false };
+  return { platafs, moedas, espinhos, inimigos, portao, largura: portao.x + 260, inicioX: 40 };
+}
+
+function novaFase(primeira){
+  g.fase += primeira ? 0 : 1;
+  const dados = gerarFase(g.fase);
+  g.mundo = dados;
+  g.jogador.x = dados.inicioX;
+  g.jogador.y = CHAO - g.jogador.h;
+  g.jogador.vx = 0; g.jogador.vy = 0;
+  g.checkpointX = dados.inicioX;
+  faixa("FASE " + g.fase, dados.moedas.length + " moedas · portão no fim");
+  hud();
+}
+
+function iniciar(){
+  g = {
+    pontos:0, vidas:3, fase:0, sequencia:0, multi:1, moedasTotal:0,
+    quizOk:0, quizTotal:0, erradas:[], filaQuiz: baralhar(PERGUNTAS),
+    jogador:{ x:40, y:CHAO-40, w:26, h:40, vx:0, vy:0, emChao:false, inv:60, morto:0 },
+    camX:0, part:[], tremor:0, aura:null, avisoT:0, aviso:"",
+    checkpointX:40, inicioTs:Date.now()
+  };
+  estado = "jogo";
+  fecharCamadas();
+  novaFase(true);
+}
+
+function faixa(tag, texto, bonus = false){
+  el("stripTag").textContent = tag;
+  el("stripTag").className = "tag" + (bonus ? " bonus" : "");
+  el("stripText").textContent = texto;
+}
+function hud(){
+  el("hScore").textContent = g.pontos.toLocaleString("pt-BR");
+  el("hMult").textContent = "x" + g.multi;
+  el("hFase").textContent = g.fase;
+  el("hLives").textContent = "●".repeat(Math.max(0, g.vidas)) || "—";
+  el("hMoedas").textContent = g.moedasTotal;
+}
+function aviso(txt){ g.aviso = txt; g.avisoT = 120; }
+
+function marcar(pts){
+  g.pontos += pts * g.multi;
+  g.sequencia++;
+  if(g.sequencia % 8 === 0 && g.multi < 8){
+    g.multi++;
+    aviso("COMBO x" + g.multi);
+    bip(1320, .1, "square", .05);
+  }
+  hud();
+}
+
+function explodir(x, y, cor, n = 20){
+  for(let i = 0; i < n; i++)
+    g.part.push({ x, y, vx:(Math.random()-.5)*7, vy:(Math.random()-.5)*7, v:30, cor });
+}
+
+function perderVida(){
+  if(g.jogador.inv > 0 || g.jogador.morto > 0) return;
+  g.vidas--; g.sequencia = 0; g.multi = 1;
+  g.tremor = 16; g.aura = { c:"rgba(255,67,176,.2)", t:20 };
+  explodir(g.jogador.x + g.jogador.w/2, g.jogador.y + g.jogador.h/2, "#ff43b0", 30);
+  bip(90, .35, "sawtooth", .06);
+  hud();
+  if(g.vidas <= 0){ g.jogador.morto = 60; return; }
+  g.jogador.morto = 40;
+}
+
+/* ---- Portão / quiz ---- */
+function abrirPortao(){
+  const p = g.filaQuiz[g.quizTotal % g.filaQuiz.length];
+  g.quizTotal++;
+  const ops = baralhar(p.a);
+  g.quiz = { p, ops, certa:p.a[0], tempo:15*60, max:15*60, resolvido:false };
+  estado = "portao";
+  faixa("PORTÃO", "Responda para destrancar", true);
+  el("quizPergunta").textContent = p.q;
+  const cont = el("quizOps"); cont.innerHTML = "";
+  const teclasN = ["1","2","3","4"];
+  ops.forEach((txt, i) => {
+    const b = document.createElement("button");
+    b.innerHTML = '<span class="k">' + teclasN[i] + '</span>' + txt;
+    b.onclick = () => responderQuiz(txt === p.a[0]);
+    cont.appendChild(b);
+  });
+  el("lyQuiz").classList.add("on");
+  bip(1050, .14, "sine", .045);
+}
+
+function responderQuiz(ok){
+  if(!g.quiz || g.quiz.resolvido) return;
+  g.quiz.resolvido = true;
+  el("lyQuiz").classList.remove("on");
+  fecharPortao(ok);
+}
+
+function fecharPortao(ok){
+  g.mundo.portao.aberto = true;
+  if(ok){
+    const b = 300 * g.fase;
+    g.pontos += b; g.quizOk++;
+    aviso("PORTÃO ABERTO · +" + b.toLocaleString("pt-BR") + " pts");
+    bip(760, .1, "square", .05);
+    setTimeout(() => bip(1140, .16, "square", .05), 110);
+  } else {
+    g.erradas.push({ q:g.quiz.p.q, r:g.quiz.certa, e:g.quiz.p.e });
+    aviso("Era " + g.quiz.certa + " · " + g.quiz.p.e);
+    bip(160, .25, "sawtooth", .05);
+    perderVida();
+  }
+  g.quiz = null;
+  estado = g.jogador.morto > 0 ? "jogo" : "jogo";
+  hud();
+}
+
+/* ---- Física e colisão ---- */
+const teclas = { esq:false, dir:false, pulo:false };
+const GRAV = .62, VELX = 4.4, PULO = -12.6;
+
+function resolverColisao(p, plataformas){
+  p.emChao = false;
+  for(const pl of plataformas){
+    if(p.x < pl.x+pl.w && p.x+p.w > pl.x && p.y < pl.y+pl.h && p.y+p.h > pl.y){
+      const oX1 = (p.x+p.w) - pl.x, oX2 = (pl.x+pl.w) - p.x;
+      const oY1 = (p.y+p.h) - pl.y, oY2 = (pl.y+pl.h) - p.y;
+      const minX = Math.min(oX1, oX2), minY = Math.min(oY1, oY2);
+      if(minY < minX){
+        if(oY1 < oY2){ p.y = pl.y - p.h; p.vy = 0; p.emChao = true; }
+        else { p.y = pl.y + pl.h; p.vy = 0; }
+      } else {
+        if(oX1 < oX2) p.x = pl.x - p.w; else p.x = pl.x + pl.w;
+        p.vx = 0;
+      }
+    }
+  }
+}
+
+function passo(){
+  g.part = g.part.filter(p => { p.x += p.vx; p.y += p.vy; p.vy += .12; return --p.v > 0; });
+  if(g.tremor > 0) g.tremor--;
+  if(g.aura && --g.aura.t <= 0) g.aura = null;
+  if(g.avisoT > 0) g.avisoT--;
+
+  if(g.jogador.morto > 0){
+    if(--g.jogador.morto === 0){
+      if(g.vidas <= 0){ fim(); return; }
+      g.jogador.x = g.checkpointX; g.jogador.y = CHAO - g.jogador.h;
+      g.jogador.vx = 0; g.jogador.vy = 0; g.jogador.inv = 90;
+    }
+    return;
+  }
+
+  const j = g.jogador;
+  if(teclas.esq) j.vx = -VELX;
+  else if(teclas.dir) j.vx = VELX;
+  else j.vx *= .78;
+  if(teclas.pulo && j.emChao){ j.vy = PULO; bip(500, .06, "square", .03); }
+  j.vy = Math.min(j.vy + GRAV, 15);
+  j.x += j.vx; j.y += j.vy;
+  if(j.x < 0) j.x = 0;
+  resolverColisao(j, g.mundo.platafs);
+  if(j.inv > 0) j.inv--;
+
+  if(j.y > H + 60){ perderVida(); return; }
+
+  g.mundo.moedas.forEach(m=>{
+    if(!m.viva) return;
+    if(j.x < m.x+m.w && j.x+j.w > m.x && j.y < m.y+m.h && j.y+j.h > m.y){
+      m.viva = false; g.moedasTotal++;
+      marcar(10);
+      explodir(m.x+6, m.y+6, "#ffc247", 10);
+      bip(1200, .05, "square", .03);
+    }
+  });
+
+  g.mundo.espinhos.forEach(s=>{
+    if(j.x < s.x+s.w && j.x+j.w > s.x && j.y < s.y+s.h && j.y+j.h > s.y) perderVida();
+  });
+
+  g.mundo.inimigos.forEach(m=>{
+    if(!m.vivo) return;
+    m.animar += .06;
+    m.x += m.vel*m.dir;
+    if(m.x < m.min || m.x + m.w > m.max) m.dir *= -1;
+    if(j.x < m.x+m.w && j.x+j.w > m.x && j.y < m.y+m.h && j.y+j.h > m.y) perderVida();
+  });
+
+  const p = g.mundo.portao;
+  if(!p.aberto && !p.tentado && j.x + j.w > p.x - 6){
+    p.tentado = true;
+    j.vx = 0; j.x = p.x - j.w - 4;
+    abrirPortao();
+    return;
+  }
+  if(p.aberto && j.x > p.x + p.w + 40){
+    novaFase(false);
+    return;
+  }
+
+  const alvoCam = Math.max(0, j.x - 260);
+  g.camX += (alvoCam - g.camX) * .12;
+}
+
+/* ---- Desenho ---- */
+const estrelas = Array.from({length:60}, () => ({
+  x:Math.random()*W, y:Math.random()*H*.6, v:.1 + Math.random()*.4, r:Math.random()*1.6 + .4
+}));
+
+function desenharJogador(x, y, piscar){
+  if(piscar && Math.floor(Date.now()/70) % 2) return;
+  ctx.fillStyle = "#3ff0ff";
+  ctx.fillRect(x+6, y, 14, 14);
+  ctx.fillStyle = "#ffc247";
+  ctx.fillRect(x+2, y+16, 22, 18);
+  ctx.fillStyle = "#3ff0ff";
+  ctx.fillRect(x, y+34, 8, 6); ctx.fillRect(x+18, y+34, 8, 6);
+}
+
+function render(){
+  ctx.clearRect(0,0,W,H);
+  ctx.save();
+  if(g && g.tremor > 0) ctx.translate((Math.random()-.5)*g.tremor, (Math.random()-.5)*g.tremor);
+
+  const gr = ctx.createLinearGradient(0,0,0,H);
+  gr.addColorStop(0,"#160939"); gr.addColorStop(1,"#0a0421");
+  ctx.fillStyle = gr; ctx.fillRect(-24,-24,W+48,H+48);
+
+  estrelas.forEach(s=>{
+    s.x -= s.v*(g ? .3 : 0);
+    if(s.x < 0) s.x = W;
+    ctx.fillStyle = "rgba(205,185,255," + (.2 + s.v/1.3) + ")";
+    ctx.fillRect(s.x, s.y, s.r, s.r);
+  });
+
+  if(g){
+    ctx.save();
+    ctx.translate(-g.camX, 0);
+
+    ctx.fillStyle = "#3a1f7a";
+    g.mundo.platafs.forEach(pl => ctx.fillRect(pl.x, pl.y, pl.w, pl.h));
+    ctx.strokeStyle = "#6a3fd6"; ctx.lineWidth = 2;
+    g.mundo.platafs.forEach(pl => ctx.strokeRect(pl.x, pl.y+.5, pl.w, 2));
+
+    ctx.fillStyle = "#ffc247";
+    g.mundo.moedas.forEach(m=>{
+      if(!m.viva) return;
+      ctx.beginPath();
+      ctx.arc(m.x+6, m.y+6, 6 + Math.sin(Date.now()/200 + m.x)*1.2, 0, Math.PI*2);
+      ctx.fill();
+    });
+
+    ctx.fillStyle = "#ff43b0";
+    g.mundo.espinhos.forEach(s=>{
+      ctx.beginPath();
+      ctx.moveTo(s.x, s.y+s.h); ctx.lineTo(s.x+s.w/2, s.y); ctx.lineTo(s.x+s.w, s.y+s.h);
+      ctx.closePath(); ctx.fill();
+    });
+
+    ctx.fillStyle = "#b6ff3d";
+    g.mundo.inimigos.forEach(m=>{
+      if(!m.vivo) return;
+      const bob = Math.sin(m.animar)*3;
+      ctx.fillRect(m.x, m.y+bob, m.w, m.h);
+    });
+
+    const p = g.mundo.portao;
+    ctx.fillStyle = p.aberto ? "#b6ff3d" : "#ff43b0";
+    ctx.fillRect(p.x, p.y, p.w, p.h);
+    ctx.fillStyle = "#0b0524";
+    ctx.fillRect(p.x+p.w/2-3, p.y+14, 6, p.h-28);
+    if(!p.aberto){
+      ctx.fillStyle = "#2b0f52";
+      ctx.beginPath(); ctx.arc(p.x+p.w/2, p.y-10, 9, 0, Math.PI*2); ctx.fill();
+    }
+
+    g.part.forEach(pt=>{
+      ctx.globalAlpha = Math.max(0, pt.v/30);
+      ctx.fillStyle = pt.cor; ctx.fillRect(pt.x, pt.y, 4, 4);
+    });
+    ctx.globalAlpha = 1;
+
+    if(g.jogador.morto === 0) desenharJogador(g.jogador.x, g.jogador.y, g.jogador.inv > 0);
+
+    ctx.restore();
+  }
+
+  if(g && g.avisoT > 0){
+    ctx.globalAlpha = Math.min(1, g.avisoT/40);
+    ctx.fillStyle = "#ffc247";
+    ctx.textAlign = "center";
+    ctx.font = "12px 'Press Start 2P', monospace";
+    ctx.fillText(g.aviso, W/2, H - 24, W - 40);
+    ctx.globalAlpha = 1;
+  }
+  if(g && g.aura){ ctx.fillStyle = g.aura.c; ctx.fillRect(-24,-24,W+48,H+48); }
+  ctx.restore();
+}
+
+function loop(ts){
+  requestAnimationFrame(loop);
+  if(ts - ultimo < 15) return;
+  ultimo = ts;
+  if(estado === "jogo") passo();
+  if(estado === "portao" && g.quiz){
+    g.quiz.tempo--;
+    el("quizBar").style.width = Math.max(0, g.quiz.tempo/g.quiz.max*100) + "%";
+    if(g.quiz.tempo <= 0 && !g.quiz.resolvido) responderQuiz(false);
+  }
+  render();
+}
+requestAnimationFrame(loop);
+
+/* =====================================================================
+   4. FIM DE JOGO
+   ===================================================================== */
+async function fim(){
+  estado = "fim";
+  el("nScore").textContent = g.pontos.toLocaleString("pt-BR");
+  el("nFase").textContent = g.fase;
+  el("nMoedas").textContent = g.moedasTotal;
+  el("nQuiz").textContent = g.quizOk + "/" + g.quizTotal;
+
+  const mm = el("nMissed"); mm.innerHTML = "";
+  g.erradas.forEach(f=>{
+    const d = document.createElement("div");
+    d.innerHTML = "<em>" + f.q + "</em> <b>" + f.r + "</b> — " + f.e;
+    mm.appendChild(d);
+  });
+
+  if(HOSPEDADO){
+    const duracao = Math.round((Date.now() - g.inicioTs) / 1000);
+    enviarParaHost("GAME_OVER", {
+      score: g.pontos,
+      duration_seconds: duracao,
+      quiz: { correct: g.quizOk, total: g.quizTotal },
+      nickname: jogadorNome,
+      metadata: { fase_alcancada: g.fase, moedas_coletadas: g.moedasTotal }
+    });
+    el("nameTitle").textContent = "Fim de jogo";
+    el("nameHint").textContent = "Placar enviado para o Recreio Arcade.";
+    el("initials").style.display = "none";
+    el("btnSave").style.display = "none";
+    el("btnSkip").textContent = "VOLTAR AO PAINEL";
+    el("btnSkip").onclick = () => enviarParaHost("EXIT_GAME", {});
+    el("lyName").classList.add("on");
+    return;
+  }
+
+  el("initials").style.display = "";
+  el("btnSave").style.display = "";
+  el("btnSkip").textContent = "PULAR";
+  el("btnSkip").onclick = () => { el("lyName").classList.remove("on"); mostrarRank(null); };
+
+  listaRank = await ranking.carregar();
+  const corte = listaRank.length >= 10 ? listaRank[9].s : 0;
+  const entra = g.pontos > corte;
+  el("nameTitle").textContent = entra ? "Você entrou no ranking" : "Fim de jogo";
+  el("nameHint").textContent = entra
+    ? "Digite suas iniciais para gravar o placar."
+    : "Fora do top 10 desta vez. Grave assim mesmo e tente de novo.";
+  el("initials").value = "";
+  el("lyName").classList.add("on");
+  setTimeout(() => el("initials").focus(), 120);
+}
+
+async function gravarPlacar(){
+  const nome = (el("initials").value || "AAA").toUpperCase()
+    .replace(/[^A-Z0-9]/g,"").padEnd(3,"A").slice(0,3);
+  const item = { n:nome, s:g.pontos, w:g.fase, m:g.moedasTotal, d:new Date().toISOString().slice(0,10) };
+  listaRank = await ranking.carregar();
+  listaRank.push(item);
+  listaRank.sort((x,y) => y.s - x.s);
+  listaRank = listaRank.slice(0,10);
+  const ok = await ranking.gravar(listaRank);
+  el("lyName").classList.remove("on");
+  mostrarRank(item, ok ? "" : "Não foi possível salvar o ranking neste navegador.");
+}
+
+async function mostrarRank(destaque, nota = ""){
+  if(!listaRank.length) listaRank = await ranking.carregar();
+  const tb = el("rankBody"); tb.innerHTML = "";
+  if(!listaRank.length){
+    tb.innerHTML = '<tr><td colspan="4" style="color:#a795d6;padding:16px 8px">Nenhum placar gravado ainda. Seja o primeiro.</td></tr>';
+  }
+  listaRank.forEach((r, i)=>{
+    const tr = document.createElement("tr");
+    if(destaque && r.n === destaque.n && r.s === destaque.s) tr.className = "me";
+    tr.innerHTML = '<td class="pos">' + (i+1) + '</td><td class="nm">' + r.n + '</td>' +
+      '<td class="sc">' + r.s.toLocaleString("pt-BR") + '</td><td class="wv">' + r.w + '</td>';
+    tb.appendChild(tr);
+  });
+  el("rankNote").textContent = nota;
+  el("hBest").textContent = listaRank.length ? listaRank[0].s.toLocaleString("pt-BR") : "—";
+  fecharCamadas();
+  el("lyRank").classList.add("on");
+  estado = "menu";
+}
+
+function fecharCamadas(){
+  ["lyMenu","lyPause","lyQuiz","lyName","lyRank"].forEach(id => el(id).classList.remove("on"));
+}
+
+/* =====================================================================
+   5. CONTROLES
+   ===================================================================== */
+addEventListener("keydown", e=>{
+  const k = e.key.toLowerCase();
+  if(document.activeElement === el("initials")){
+    if(k === "enter") gravarPlacar();
+    return;
+  }
+  if(estado === "portao" && ["1","2","3","4"].includes(k)){
+    const btns = el("quizOps").children;
+    const i = parseInt(k,10) - 1;
+    if(btns[i]) btns[i].click();
+    return;
+  }
+  if(["arrowleft","arrowright"," ","arrowup"].includes(k)) e.preventDefault();
+  if(k === "arrowleft" || k === "a") teclas.esq = true;
+  if(k === "arrowright" || k === "d") teclas.dir = true;
+  if(k === " " || k === "arrowup" || k === "w") teclas.pulo = true;
+  if(k === "p" || k === "escape"){
+    if(estado === "jogo"){ estado = "pausa"; el("lyPause").classList.add("on"); }
+    else if(estado === "pausa"){ estado = "jogo"; el("lyPause").classList.remove("on"); }
+  }
+});
+addEventListener("keyup", e=>{
+  const k = e.key.toLowerCase();
+  if(k === "arrowleft" || k === "a") teclas.esq = false;
+  if(k === "arrowright" || k === "d") teclas.dir = false;
+  if(k === " " || k === "arrowup" || k === "w") teclas.pulo = false;
+});
+
+function segurar(btn, prop){
+  const on = e => { e.preventDefault(); teclas[prop] = true; };
+  const off = e => { e.preventDefault(); teclas[prop] = false; };
+  btn.addEventListener("touchstart", on, {passive:false});
+  btn.addEventListener("touchend", off); btn.addEventListener("touchcancel", off);
+  btn.addEventListener("mousedown", on); btn.addEventListener("mouseup", off);
+  btn.addEventListener("mouseleave", off);
+}
+segurar(el("btnL"), "esq");
+segurar(el("btnR"), "dir");
+segurar(el("btnJ"), "pulo");
+
+el("btnStart").onclick = iniciar;
+el("btnRestart").onclick = iniciar;
+el("btnResume").onclick = () => { estado = "jogo"; el("lyPause").classList.remove("on"); };
+el("btnSave").onclick = gravarPlacar;
+el("btnSeeRank").onclick = () => mostrarRank(null);
+el("btnBackMenu").onclick = () => { fecharCamadas(); el("lyMenu").classList.add("on"); estado = "menu"; };
+
+if(HOSPEDADO){
+  enviarParaHost("GAME_READY", {});
+} else {
+  ranking.carregar().then(l=>{
+    listaRank = l;
+    if(l.length) el("hBest").textContent = l[0].s.toLocaleString("pt-BR");
+  });
+}
+</script>
+</body>
+</html>
