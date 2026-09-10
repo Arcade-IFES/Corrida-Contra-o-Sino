@@ -575,7 +575,7 @@ function passo(){
   const j = g.jogador;
   if(teclas.esq) j.vx = -VELX;
   else if(teclas.dir) j.vx = VELX;
-  else j.vx *= .78;
+  else j.vx = 0;
   if(teclas.pulo && j.emChao){ j.vy = PULO; bip(500, .06, "square", .03); }
   j.vy = Math.min(j.vy + GRAV, 15);
   j.x += j.vx; j.y += j.vy;
