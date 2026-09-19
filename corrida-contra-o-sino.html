@@ -33,6 +33,13 @@
     color:var(--amber); text-shadow:0 0 12px rgba(255,194,71,.5), 3px 3px 0 #7a2bb8;
   }
   .marquee p{margin:0; font-size:12.5px; color:var(--dim)}
+  .marquee .mtitle{display:flex; align-items:center; gap:10px}
+  #btnMute{
+    flex:0 0 auto; width:30px; height:30px; border-radius:8px; border:2px solid var(--grid);
+    background:#1e0f4a; color:var(--cyan); font-size:14px; cursor:pointer; line-height:1;
+  }
+  #btnMute:active{transform:translateY(1px)}
+  #btnMute.off{color:var(--dim); border-color:#3a2a5c}
 
   .screen{position:relative; background:#0b0524; border-radius:12px; overflow:hidden;
     box-shadow:0 0 0 4px #0a0322, 0 0 0 6px #6a3fd6}
@@ -66,6 +73,11 @@
     background:linear-gradient(180deg,#6b3db3,#35225e); color:#fef3ff; flex:0 0 auto;
   }
   .strip .tag.bonus{background:linear-gradient(180deg,#ffbf69,#ff8749); color:#2d112d}
+  .strip .tag.chefe{background:linear-gradient(180deg,#ff5bbd,#a3195b); color:#fff0f7}
+
+  .chefe-dots{display:flex; gap:6px; justify-content:center}
+  .chefe-dots span{width:13px; height:13px; border-radius:50%; background:#33176f; border:2px solid #6a3fd6}
+  .chefe-dots span.ok{background:var(--lime); border-color:var(--lime)}
 
   canvas{display:block; width:100%; height:auto; background:#0b0524; touch-action:none}
 
@@ -150,7 +162,10 @@
 <body>
 <div class="cabinet">
   <div class="marquee">
-    <h1>Corrida Contra o Sino</h1>
+    <div class="mtitle">
+      <h1>Corrida Contra o Sino</h1>
+      <button id="btnMute" title="Música">🔊</button>
+    </div>
     <p>Atravesse o pátio até o sino. Cada portão trancado cobra uma pergunta.</p>
   </div>
 
@@ -182,6 +197,7 @@
         <div><b>alvo</b><span>Corra e pule pelo pátio até o portão do fim de cada fase. Buracos e espinhos tiram uma vida; pise fora deles.</span></div>
         <div><b>moedas</b><span>Pegue moedas sem se machucar para subir o combo, até x8. Um só dano zera tudo.</span></div>
         <div><b>portão</b><span>Todo portão vem trancado com uma pergunta. Acertar abre o portão com bônus de pontos; errar abre também, mas custa uma vida e não dá bônus.</span></div>
+        <div><b>chefão</b><span>A cada 3 fases o portão vira um guardião: é preciso acertar 3 perguntas seguidas sem errar. Uma errada zera a sequência e custa uma vida.</span></div>
         <div><b>rank</b><span>Três vidas, sem continues, mesma dificuldade para todos. Só o placar final vale.</span></div>
       </div>
       <div class="row">
@@ -200,6 +216,7 @@
       <h2 id="quizTag">PORTÃO TRANCADO</h2>
       <p id="quizPergunta">—</p>
       <div class="qbar"><i id="quizBar"></i></div>
+      <div class="chefe-dots" id="quizChefeDots" style="display:none"></div>
       <div class="quiz-ops" id="quizOps"></div>
     </div>
 
@@ -390,13 +407,63 @@ function bip(f, d = .07, t = "square", v = .04){
   }catch(e){}
 }
 
+/* ---- Música de fundo (loop 8-bit procedural, sem arquivos externos) ---- */
+const musica = {
+  tocando:false, mudo:false, passo:0, timer:null, bpm:132,
+  baixo:   [110,0,110,146.83, 98,0,98,130.81, 110,0,110,146.83, 87.31,0,98,0],
+  melodia: [440,0,523.25,0, 659.25,0,587.33,523.25, 493.88,0,440,0, 392,440,493.88,0],
+  nota(f, d, tipo, vol, quando){
+    if(!f) return;
+    try{
+      const o = ac.createOscillator(), gn = ac.createGain();
+      o.type = tipo; o.frequency.value = f;
+      gn.gain.setValueAtTime(0, quando);
+      gn.gain.linearRampToValueAtTime(vol, quando + .01);
+      gn.gain.exponentialRampToValueAtTime(.0001, quando + d);
+      o.connect(gn).connect(ac.destination);
+      o.start(quando); o.stop(quando + d + .02);
+    }catch(e){}
+  },
+  agendarPasso(){
+    if(!this.tocando) return;
+    const dur = 60 / this.bpm / 2;
+    if(!this.mudo){
+      const t = ac.currentTime + .02;
+      this.nota(this.baixo[this.passo % this.baixo.length], dur*1.9, "triangle", .05, t);
+      this.nota(this.melodia[this.passo % this.melodia.length], dur*.85, "square", .028, t);
+    }
+    this.passo++;
+    this.timer = setTimeout(() => this.agendarPasso(), dur*1000);
+  },
+  iniciar(){
+    try{
+      if(!ac) ac = new (window.AudioContext || window.webkitAudioContext)();
+      if(ac.state === "suspended") ac.resume();
+    }catch(e){ return; }
+    if(this.tocando) return;
+    this.tocando = true;
+    this.agendarPasso();
+  },
+  parar(){
+    this.tocando = false;
+    clearTimeout(this.timer);
+  },
+  alternarMudo(){
+    this.mudo = !this.mudo;
+    const b = el("btnMute");
+    b.textContent = this.mudo ? "🔇" : "🔊";
+    b.classList.toggle("off", this.mudo);
+  }
+};
+
 /* ---- Geração de fase ---- */
 function gerarFase(fase){
-  const dif = Math.min(fase, 10);
+  const chefe = fase % 3 === 0;
+  const dif = Math.min(fase, 10) + (chefe ? 2 : 0);
   const platafs = [{ x:0, y:CHAO, w:260, h:80 }];
   const moedas = [], espinhos = [], inimigos = [];
   let x = 260;
-  const segmentos = 6 + Math.floor(fase/2);
+  const segmentos = 6 + Math.floor(fase/2) + (chefe ? 2 : 0);
   for(let i = 0; i < segmentos; i++){
     const gap = 55 + Math.random()*35 + dif*7;
     x += gap;
@@ -414,8 +481,9 @@ function gerarFase(fase){
   }
   const finalX = x + 70;
   platafs.push({ x:finalX - 30, y:CHAO, w:280, h:80 });
-  const portao = { x:finalX + 150, y:CHAO - 96, w:34, h:96, aberto:false, tentado:false };
-  return { platafs, moedas, espinhos, inimigos, portao, largura: portao.x + 260, inicioX: 40 };
+  const portaoW = chefe ? 56 : 34, portaoH = chefe ? 140 : 96;
+  const portao = { x:finalX + 150, y:CHAO - portaoH, w:portaoW, h:portaoH, aberto:false, tentado:false, chefe };
+  return { platafs, moedas, espinhos, inimigos, portao, largura: portao.x + 260, inicioX: 40, chefe };
 }
 
 function novaFase(primeira){
@@ -426,13 +494,15 @@ function novaFase(primeira){
   g.jogador.y = CHAO - g.jogador.h;
   g.jogador.vx = 0; g.jogador.vy = 0;
   g.checkpointX = dados.inicioX;
-  faixa("FASE " + g.fase, dados.moedas.length + " moedas · portão no fim");
+  g.chefeStreak = 0;
+  if(dados.chefe) faixa("FASE " + g.fase + " · CHEFÃO", "Um guardião protege o portão final", "chefe");
+  else faixa("FASE " + g.fase, dados.moedas.length + " moedas · portão no fim");
   hud();
 }
 
 function iniciar(){
   g = {
-    pontos:0, vidas:3, fase:0, sequencia:0, multi:1, moedasTotal:0,
+    pontos:0, vidas:3, fase:1, sequencia:0, multi:1, moedasTotal:0,
     quizOk:0, quizTotal:0, erradas:[], filaQuiz: baralhar(PERGUNTAS),
     jogador:{ x:40, y:CHAO-40, w:26, h:40, vx:0, vy:0, emChao:false, inv:60, morto:0 },
     camX:0, part:[], tremor:0, aura:null, avisoT:0, aviso:"",
@@ -441,11 +511,12 @@ function iniciar(){
   estado = "jogo";
   fecharCamadas();
   novaFase(true);
+  musica.iniciar();
 }
 
-function faixa(tag, texto, bonus = false){
+function faixa(tag, texto, variante = ""){
   el("stripTag").textContent = tag;
-  el("stripTag").className = "tag" + (bonus ? " bonus" : "");
+  el("stripTag").className = "tag" + (variante ? " " + variante : "");
   el("stripText").textContent = texto;
 }
 function hud(){
@@ -485,13 +556,29 @@ function perderVida(){
 }
 
 /* ---- Portão / quiz ---- */
+function atualizarDotsChefe(chefe){
+  const box = el("quizChefeDots");
+  if(!chefe){ box.style.display = "none"; box.innerHTML = ""; return; }
+  box.style.display = "flex";
+  box.innerHTML = "";
+  for(let i = 0; i < 3; i++){
+    const s = document.createElement("span");
+    if(i < g.chefeStreak) s.className = "ok";
+    box.appendChild(s);
+  }
+}
+
 function abrirPortao(){
   const p = g.filaQuiz[g.quizTotal % g.filaQuiz.length];
   g.quizTotal++;
   const ops = baralhar(p.a);
   g.quiz = { p, ops, certa:p.a[0], tempo:15*60, max:15*60, resolvido:false };
   estado = "portao";
-  faixa("PORTÃO", "Responda para destrancar", true);
+  const chefe = g.mundo.portao.chefe;
+  el("quizTag").textContent = chefe ? "GUARDIÃO DO PORTÃO" : "PORTÃO TRANCADO";
+  if(chefe) faixa("CHEFÃO · " + g.chefeStreak + "/3", "Acerte 3 perguntas seguidas para derrotar o guardião", "chefe");
+  else faixa("PORTÃO", "Responda para destrancar", "bonus");
+  atualizarDotsChefe(chefe);
   el("quizPergunta").textContent = p.q;
   const cont = el("quizOps"); cont.innerHTML = "";
   const teclasN = ["1","2","3","4"];
@@ -502,7 +589,7 @@ function abrirPortao(){
     cont.appendChild(b);
   });
   el("lyQuiz").classList.add("on");
-  bip(1050, .14, "sine", .045);
+  bip(chefe ? 700 : 1050, .14, chefe ? "sawtooth" : "sine", .045);
 }
 
 function responderQuiz(ok){
@@ -513,7 +600,44 @@ function responderQuiz(ok){
 }
 
 function fecharPortao(ok){
-  g.mundo.portao.aberto = true;
+  const p = g.mundo.portao;
+
+  if(p.chefe){
+    if(ok){
+      g.chefeStreak++;
+      bip(760, .08, "square", .05);
+      if(g.chefeStreak >= 3){
+        p.aberto = true;
+        const b = 700 * g.fase;
+        g.pontos += b; g.quizOk++;
+        aviso("GUARDIÃO DERROTADO · +" + b.toLocaleString("pt-BR") + " pts");
+        bip(1140, .2, "square", .06);
+        setTimeout(() => bip(1520, .22, "square", .05), 130);
+        g.quiz = null; estado = "jogo"; hud();
+        return;
+      }
+      aviso("ACERTOU · " + g.chefeStreak + "/3 · próxima pergunta");
+      g.quiz = null; estado = "jogo"; hud();
+      setTimeout(() => { if(estado === "jogo" && g.mundo.portao === p && !p.aberto) abrirPortao(); }, 700);
+      return;
+    }
+    g.erradas.push({ q:g.quiz.p.q, r:g.quiz.certa, e:g.quiz.p.e });
+    g.chefeStreak = 0;
+    aviso("Sequência zerada · Era " + g.quiz.certa);
+    bip(160, .25, "sawtooth", .05);
+    g.quiz = null; hud();
+    perderVida();
+    estado = "jogo";
+    const tentarDeNovo = () => {
+      if(estado === "fim") return;
+      if(g.jogador.morto > 0){ setTimeout(tentarDeNovo, 60); return; }
+      if(g.mundo.portao === p && !p.aberto) abrirPortao();
+    };
+    setTimeout(tentarDeNovo, 60);
+    return;
+  }
+
+  p.aberto = true;
   if(ok){
     const b = 300 * g.fase;
     g.pontos += b; g.quizOk++;
@@ -527,7 +651,7 @@ function fecharPortao(ok){
     perderVida();
   }
   g.quiz = null;
-  estado = g.jogador.morto > 0 ? "jogo" : "jogo";
+  estado = "jogo";
   hud();
 }
 
@@ -607,6 +731,7 @@ function passo(){
   if(!p.aberto && !p.tentado && j.x + j.w > p.x - 6){
     p.tentado = true;
     j.vx = 0; j.x = p.x - j.w - 4;
+    if(p.chefe) g.checkpointX = j.x;
     abrirPortao();
     return;
   }
@@ -682,13 +807,24 @@ function render(){
     });
 
     const p = g.mundo.portao;
-    ctx.fillStyle = p.aberto ? "#b6ff3d" : "#ff43b0";
+    if(p.chefe && !p.aberto){
+      const pulso = Math.sin(Date.now()/220)*4;
+      ctx.fillStyle = "rgba(255,67,176,.25)";
+      ctx.beginPath(); ctx.arc(p.x+p.w/2, p.y+p.h/2, p.w*.9 + pulso, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.fillStyle = p.aberto ? "#b6ff3d" : (p.chefe ? "#ff2e97" : "#ff43b0");
     ctx.fillRect(p.x, p.y, p.w, p.h);
     ctx.fillStyle = "#0b0524";
     ctx.fillRect(p.x+p.w/2-3, p.y+14, 6, p.h-28);
     if(!p.aberto){
       ctx.fillStyle = "#2b0f52";
-      ctx.beginPath(); ctx.arc(p.x+p.w/2, p.y-10, 9, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(p.x+p.w/2, p.y-10, p.chefe ? 15 : 9, 0, Math.PI*2); ctx.fill();
+    }
+    if(p.chefe && !p.aberto){
+      ctx.fillStyle = "#fff0f7";
+      ctx.textAlign = "center";
+      ctx.font = "9px 'Press Start 2P', monospace";
+      ctx.fillText((g.chefeStreak||0) + "/3", p.x+p.w/2, p.y - 24);
     }
 
     g.part.forEach(pt=>{
@@ -733,6 +869,7 @@ requestAnimationFrame(loop);
    ===================================================================== */
 async function fim(){
   estado = "fim";
+  musica.parar();
   el("nScore").textContent = g.pontos.toLocaleString("pt-BR");
   el("nFase").textContent = g.fase;
   el("nMoedas").textContent = g.moedasTotal;
@@ -866,6 +1003,7 @@ el("btnRestart").onclick = iniciar;
 el("btnResume").onclick = () => { estado = "jogo"; el("lyPause").classList.remove("on"); };
 el("btnSave").onclick = gravarPlacar;
 el("btnSeeRank").onclick = () => mostrarRank(null);
+el("btnMute").onclick = () => musica.alternarMudo();
 el("btnBackMenu").onclick = () => { fecharCamadas(); el("lyMenu").classList.add("on"); estado = "menu"; };
 
 if(HOSPEDADO){
